@@ -230,8 +230,13 @@ export default function Home() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="relative h-[360px] w-full overflow-hidden rounded-lg border border-border/60 bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.18),_transparent_55%),linear-gradient(120deg,_rgba(79,70,229,0.18),_transparent_60%),linear-gradient(to_bottom,_rgba(15,23,42,0.35),_rgba(15,23,42,0.05))]">
-                  <div className="absolute inset-0 opacity-40 [background-image:linear-gradient(to_right,rgba(148,163,184,0.2)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.2)_1px,transparent_1px)] [background-size:32px_32px]" />
+                <div
+                  role="region"
+                  aria-label="Tactical map preview"
+                  tabIndex={0}
+                  className="relative h-[360px] w-full overflow-hidden rounded-lg border border-border/60 bg-surface map-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                >
+                  <div className="absolute inset-0 opacity-40 map-grid" />
                   <div className="relative z-10 flex h-full flex-col justify-between p-6">
                     <div className="flex items-center gap-3">
                       <Badge variant="success">GEOLOCK</Badge>
