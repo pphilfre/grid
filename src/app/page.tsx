@@ -181,11 +181,11 @@ export default function NeumorphicMapDashboard() {
 
     const map = new mapboxgl.Map({
       container: mapContainerRef.current,
-      style: MAP_STYLES.find(style => style.id === styleId)?.uri,
+      style: MAP_STYLES.find(style => style.id === styleIdRef.current)?.uri,
       center: [6.0, 28.0],
       zoom: 1.6,
-      pitch: is3d ? 35 : 0,
-      bearing: is3d ? -10 : 0,
+      pitch: is3dRef.current ? 35 : 0,
+      bearing: is3dRef.current ? -10 : 0,
       projection: { name: "globe" },
     });
 
@@ -301,7 +301,11 @@ export default function NeumorphicMapDashboard() {
 
     const style = MAP_STYLES.find(item => item.id === styleId)?.uri;
     if (style) {
-      mapRef.current.setStyle(style, { diff: false });
+      mapRef.current.setStyle(style, {
+        diff: false,
+        localFontFamily: "Space Grotesk, ui-sans-serif, system-ui, sans-serif",
+        localIdeographFontFamily: "Noto Sans, ui-sans-serif, system-ui, sans-serif",
+      });
     }
     apply3dStyle(mapRef.current);
   }, [apply3dStyle, mapReady, styleId]);
