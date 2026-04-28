@@ -8,14 +8,20 @@ import {
   ChevronLeft,
   ChevronRight,
   Compass,
+  Loader2,
   Map as MapIcon,
   Radar,
   Radio,
   Settings,
   Shield,
+  Upload,
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 
 const LIVE_FEED_DATA = [
   {
@@ -88,11 +94,17 @@ export default function NeumorphicMapDashboard() {
   const [pulses, setPulses] = useState(LIVE_FEED_DATA);
   const [styleId, setStyleId] = useState("dark");
   const [is3d, setIs3d] = useState(true);
+  const [viewMode, setViewMode] = useState<"2d" | "3d" | "blue">("3d");
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
   const [mapReady, setMapReady] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
-  const markersRef = useRef<mapboxgl.Marker[]>([]);
+  const markersRef = useRef<Map<number, mapboxgl.Marker>>(new Map());
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const uploadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const styleIdRef = useRef(styleId);
   const is3dRef = useRef(is3d);
 
@@ -158,6 +170,80 @@ export default function NeumorphicMapDashboard() {
   useEffect(() => {
     is3dRef.current = is3d;
   }, [is3d]);
+
+  useEffect(() => {
+    if (viewMode === "2d") {
+      setIs3d(false);
+      setStyleId("dark");
+      return;
+    }
+
+    if (viewMode === "3d") {
+      setIs3d(true);
+      setStyleId("dark");
+      return;
+    }
+
+    setIs3d(false);
+    setStyleId("out");
+  }, [viewMode]);
+
+  useEffect(() => {
+    return () => {
+      if (uploadTimerRef.current) {
+        clearTimeout(uploadTimerRef.current);
+      }
+    };
+  }, []);
+
+  const focusSignalDrift = useCallback(() => {
+    if (!mapRef.current) {
+      return;
+    }
+
+    const target = pulses.find(pulse => pulse.title === "Signal Drift") ?? LIVE_FEED_DATA[0];
+    if (!target) {
+      return;
+    }
+
+    mapRef.current.flyTo({
+      center: [target.position.lng, target.position.lat],
+      zoom: 7,
+      speed: 0.9,
+      curve: 1.4,
+      essential: true,
+    });
+
+    const marker = markersRef.current.get(target.id);
+    marker?.togglePopup();
+  }, [pulses]);
+
+  const startUpload = useCallback(() => {
+    if (uploading) {
+      return;
+    }
+
+    setUploading(true);
+    if (uploadTimerRef.current) {
+      clearTimeout(uploadTimerRef.current);
+    }
+
+    uploadTimerRef.current = setTimeout(() => {
+      setUploading(false);
+      setUploadOpen(false);
+      focusSignalDrift();
+    }, 1600);
+  }, [focusSignalDrift, uploading]);
+
+  const handleUploadFiles = useCallback(
+    (files: FileList | null) => {
+      if (!files || files.length === 0) {
+        return;
+      }
+      startUpload();
+    },
+    [startUpload]
+  );
 
   useEffect(() => {
     if (mapRef.current || !mapContainerRef.current) {
@@ -260,7 +346,7 @@ export default function NeumorphicMapDashboard() {
 
     return () => {
       markersRef.current.forEach(marker => marker.remove());
-      markersRef.current = [];
+      markersRef.current.clear();
       map.remove();
       mapRef.current = null;
       setMapReady(false);
@@ -273,8 +359,10 @@ export default function NeumorphicMapDashboard() {
     }
 
     markersRef.current.forEach(marker => marker.remove());
-    markersRef.current = pulses.map(pulse => {
+    markersRef.current.clear();
+    pulses.forEach(pulse => {
       const element = document.createElement("div");
+      element.dataset.pulseId = String(pulse.id);
       element.className = "signal-marker";
       element.style.backgroundColor = pulse.type === "alert" ? "#22c55e" : "#60a5fa";
       element.style.boxShadow = pulse.type === "alert"
@@ -290,7 +378,7 @@ export default function NeumorphicMapDashboard() {
         )
         .addTo(mapRef.current!);
 
-      return marker;
+      markersRef.current.set(pulse.id, marker);
     });
   }, [mapReady, pulses]);
 
@@ -328,75 +416,83 @@ export default function NeumorphicMapDashboard() {
   }, [is3d, mapReady]);
 
   return (
-    <div className="flex h-screen w-full bg-[#0a0a0a] text-slate-200 font-sans overflow-hidden">
+    <div className="flex h-screen w-full bg-black text-white font-sans overflow-hidden">
       <aside
         className={cn(
-          "relative z-20 flex flex-col justify-between py-5 bg-[#0d0f12] border-r border-[#15181c] transition-all duration-300",
-          sidebarExpanded ? "w-60" : "w-[76px]"
+          "relative z-20 flex flex-col justify-between px-3 py-5 border-r border-white/10 bg-black transition-all duration-300",
+          sidebarExpanded ? "w-64" : "w-[66px]"
         )}
       >
-        <div className="flex flex-col gap-6 px-3">
-          <div className="flex items-center gap-3 px-2">
-            <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-[#12161a] border border-[#1e2226] shadow-[0_0_0_1px_rgba(34,197,94,0.08)]">
-              <Radar className="w-5 h-5 text-emerald-300" />
+        <div className="flex flex-1 flex-col gap-5">
+          <div className="flex h-[66px] w-full items-center justify-between gap-2 border-b border-white/10 px-3">
+            <div className="flex h-10 w-10 items-center justify-center border border-white/10 bg-black">
+              <Radar className="h-5 w-5 text-white" />
             </div>
-            {sidebarExpanded && (
-              <span className="text-xs font-semibold tracking-[0.4em] text-slate-200 uppercase">
-                Aegis
+            <div
+              className={cn(
+                "overflow-hidden transition-all duration-300",
+                sidebarExpanded ? "max-w-[180px] opacity-100" : "max-w-0 opacity-0"
+              )}
+            >
+              <span className="text-sm uppercase tracking-[0.32em] text-white whitespace-nowrap">
+                Grid
               </span>
-            )}
+            </div>
           </div>
 
-          <nav className="flex flex-col gap-2">
+          <div className="flex flex-1 flex-col gap-2">
             <NavItem
-              icon={<MapIcon className="w-4.5 h-4.5" />}
+              icon={<MapIcon className="h-5 w-5" />}
               label="Tactical Map"
               active={activeTab === "map"}
               expanded={sidebarExpanded}
               onClick={() => setActiveTab("map")}
             />
             <NavItem
-              icon={<Activity className="w-4.5 h-4.5" />}
+              icon={<Activity className="h-5 w-5" />}
               label="Pulse Feed"
               active={activeTab === "analytics"}
               expanded={sidebarExpanded}
               onClick={() => setActiveTab("analytics")}
             />
             <NavItem
-              icon={<Users className="w-4.5 h-4.5" />}
+              icon={<Users className="h-5 w-5" />}
               label="Operators"
               active={activeTab === "operators"}
               expanded={sidebarExpanded}
               onClick={() => setActiveTab("operators")}
             />
             <NavItem
-              icon={<Compass className="w-4.5 h-4.5" />}
+              icon={<Compass className="h-5 w-5" />}
               label="Geo Intel"
               expanded={sidebarExpanded}
             />
             <NavItem
-              icon={<Shield className="w-4.5 h-4.5" />}
+              icon={<Shield className="h-5 w-5" />}
               label="Security"
               expanded={sidebarExpanded}
             />
-          </nav>
+          </div>
         </div>
 
-        <div className="flex flex-col gap-3 px-3">
-          <NavItem icon={<Settings className="w-4.5 h-4.5" />} label="Settings" expanded={sidebarExpanded} />
-          <button
+        <div className="flex flex-col gap-3">
+          <Separator className="bg-white/10" />
+          <NavItem icon={<Settings className="h-5 w-5" />} label="Settings" expanded={sidebarExpanded} />
+          <Button
             onClick={() => setSidebarExpanded(!sidebarExpanded)}
-            className="flex items-center justify-center h-10 w-10 mx-auto rounded-xl bg-[#0f1216] hover:bg-[#141a1f] text-slate-400 hover:text-slate-200 transition-all border border-[#1f2429]"
+            variant="secondary"
+            size="icon"
+            className="mx-auto rounded-none border border-white/10 bg-black text-white hover:bg-white/10"
             aria-label="Toggle sidebar"
           >
-            {sidebarExpanded ? <ChevronLeft className="w-4.5 h-4.5" /> : <ChevronRight className="w-4.5 h-4.5" />}
-          </button>
+            {sidebarExpanded ? <ChevronLeft className="h-4.5 w-4.5" /> : <ChevronRight className="h-4.5 w-4.5" />}
+          </Button>
         </div>
       </aside>
 
       <main className="flex-1 relative overflow-hidden isolate">
         <div ref={mapContainerRef} className="absolute inset-0 h-full w-full z-0" />
-        <div className="absolute inset-0 z-10 noise-layer opacity-20 pointer-events-none" />
+        <div className="absolute inset-0 z-10 noise-layer opacity-10 pointer-events-none" />
 
         {mapError && (
           <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/60 text-xs text-slate-300">
@@ -407,60 +503,110 @@ export default function NeumorphicMapDashboard() {
         )}
 
         <div className="absolute inset-0 z-[100] pointer-events-none">
-          <div className="absolute left-6 top-6 flex items-center gap-3 pointer-events-auto">
-            <div className="flex items-center gap-2 rounded-full border border-[#1c2126] bg-[#0f1317]/80 px-3 py-1 text-xs uppercase tracking-[0.3em] text-emerald-300">
-              <Radio className="w-3.5 h-3.5 animate-pulse" />
-              Live
-            </div>
-            <div className="text-xs font-mono text-slate-400">NODE_9X / RELAY_03</div>
-          </div>
-          <div className="absolute right-6 top-6 flex flex-col items-end gap-3 pointer-events-auto">
-            <div className="flex items-center gap-2 rounded-full border border-[#1c2126] bg-[#0f1317]/80 px-3 py-1 text-[10px] uppercase tracking-[0.3em] text-slate-500">
-              Active Signals {pulses.length}
-            </div>
-
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 rounded-full border border-[#1f2429] bg-[#0f1317]/80 px-3 py-2 text-[10px] uppercase tracking-[0.3em]">
-                <span className="text-slate-500">Mode</span>
-                <button
-                  onClick={() => setIs3d(value => !value)}
-                  className={cn(
-                    "rounded-full border px-3 py-1 transition",
-                    is3d
-                      ? "border-emerald-400/60 text-emerald-200"
-                      : "border-[#1f2429] text-slate-500 hover:text-slate-200"
-                  )}
-                  aria-pressed={is3d}
-                >
-                  3D
-                </button>
+          <div className="absolute left-6 top-6 flex flex-col items-start gap-3 pointer-events-auto">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                size="icon"
+                className="rounded-none border border-white/15 bg-black text-white hover:bg-white/10"
+                onClick={() => setUploadOpen(value => !value)}
+                aria-label="Upload signal image"
+              >
+                <Upload className="h-4.5 w-4.5" />
+              </Button>
+              <div className="flex items-center gap-2 border border-white/15 bg-black px-3 py-1 text-[10px] uppercase tracking-[0.35em] text-white">
+                <Radio className="h-3.5 w-3.5 animate-pulse" />
+                Live
               </div>
+            </div>
 
-              <div className="flex items-center gap-2 rounded-full border border-[#1f2429] bg-[#0f1317]/80 px-3 py-2">
-                {MAP_STYLES.map(style => (
-                  <button
-                    key={style.id}
-                    onClick={() => setStyleId(style.id)}
+            {uploadOpen && (
+              <Card className="w-80 bg-black border-white/10 rounded-none shadow-none">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm text-white">Upload signal image</CardTitle>
+                  <p className="text-xs text-white/60">Drop a frame or select a file to analyze.</p>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div
+                    onDragOver={event => {
+                      event.preventDefault();
+                      setDragActive(true);
+                    }}
+                    onDragLeave={() => setDragActive(false)}
+                    onDrop={event => {
+                      event.preventDefault();
+                      setDragActive(false);
+                      handleUploadFiles(event.dataTransfer.files);
+                    }}
                     className={cn(
-                      "group relative flex items-center justify-center",
-                      styleId === style.id ? "" : "opacity-70"
+                      "flex min-h-[110px] flex-col items-center justify-center gap-3 border border-dashed px-4 py-4 text-center text-xs transition",
+                      dragActive
+                        ? "border-white/50 bg-white/5"
+                        : "border-white/15 bg-black"
                     )}
-                    title={style.label}
-                    aria-label={`${style.label} style`}
                   >
-                    <span
-                      className={cn(
-                        "flex h-8 w-8 items-center justify-center rounded-full text-[9px] font-semibold tracking-[0.2em] text-white shadow-[0_0_0_1px_rgba(15,18,22,0.6)] transition",
-                        "bg-gradient-to-br",
-                        style.logoClass,
-                        styleId === style.id
-                          ? "ring-2 ring-emerald-300/70"
-                          : "ring-1 ring-transparent group-hover:ring-emerald-300/40"
-                      )}
-                    >
-                      {style.logo}
-                    </span>
-                  </button>
+                    {uploading ? (
+                      <div className="flex flex-col items-center gap-2 text-white/60">
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        <span>Analyzing image stream...</span>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-2 text-white/60">
+                        <span>Drag an image here</span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="rounded-none border-white/20 bg-black text-white hover:bg-white/10"
+                          onClick={() => fileInputRef.current?.click()}
+                        >
+                          Click to upload
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={event => handleUploadFiles(event.target.files)}
+                  />
+                </CardContent>
+              </Card>
+            )}
+
+            <div className="flex items-center gap-2 text-xs font-mono text-white/50">
+              <span>NODE_9X / RELAY_03</span>
+            </div>
+          </div>
+
+          <div className="absolute right-6 top-6 flex flex-col items-end gap-3 pointer-events-auto">
+            <div className="border border-white/15 bg-black px-3 py-2 text-[10px] uppercase tracking-[0.32em] text-white/60">
+              Active signals {pulses.length}
+            </div>
+
+            <div className="flex items-center gap-2 border border-white/15 bg-black px-3 py-2">
+              <span className="text-[10px] uppercase tracking-[0.28em] text-white/50">View</span>
+              <div className="flex items-center gap-1 border border-white/10 bg-black p-1">
+                {[
+                  { id: "2d", label: "2D" },
+                  { id: "3d", label: "3D" },
+                  { id: "blue", label: "Blue" },
+                ].map(mode => (
+                  <Button
+                    key={mode.id}
+                    variant={viewMode === mode.id ? "default" : "ghost"}
+                    size="sm"
+                    className={cn(
+                      "h-7 rounded-none px-3 text-[10px] uppercase tracking-[0.24em]",
+                      viewMode === mode.id
+                        ? "bg-white text-black hover:bg-white"
+                        : "text-white/70 hover:bg-white/10"
+                    )}
+                    onClick={() => setViewMode(mode.id as "2d" | "3d" | "blue")}
+                  >
+                    {mode.label}
+                  </Button>
                 ))}
               </div>
             </div>
@@ -473,37 +619,30 @@ export default function NeumorphicMapDashboard() {
 
 function NavItem({ icon, label, active, expanded, onClick }: { icon: React.ReactNode; label: string; active?: boolean; expanded: boolean; onClick?: () => void }) {
   return (
-    <button
+    <Button
       onClick={onClick}
-      className="group relative flex items-center justify-start h-10 px-2 rounded-xl transition-all duration-200 outline-none hover:text-slate-100 text-slate-400 select-none overflow-hidden"
-    >
-      <div className={cn(
-        "absolute inset-0 rounded-xl transition-all duration-300 border",
-        active
-          ? "bg-[#11161b] border-[#1f2429] opacity-100"
-          : "bg-[#0e1115] border-transparent opacity-0 group-hover:opacity-100"
-      )} />
-
-      <div className={cn("relative z-10 flex items-center h-full w-full", active ? "text-slate-100" : "")}>
-        <div className="flex items-center justify-center h-8 w-8 rounded-lg border border-transparent group-hover:border-[#1f2429] bg-[#0a0c0f] text-slate-300">
-          {icon}
-        </div>
-
-        <div
-          className={cn(
-            "overflow-hidden transition-all duration-300 ease-in-out flex items-center whitespace-nowrap",
-            expanded ? "max-w-[200px] opacity-100 translate-x-3" : "max-w-0 opacity-0 -translate-x-4"
-          )}
-        >
-          <span className="text-xs font-medium tracking-[0.2em] uppercase text-slate-300">
-            {label}
-          </span>
-        </div>
-      </div>
-
-      {active && (
-        <div className="absolute left-[6px] top-1/2 -translate-y-1/2 w-1 h-5 rounded-full bg-emerald-300 shadow-[0_0_12px_rgba(34,197,94,0.6)]" />
+      variant={active ? "secondary" : "ghost"}
+      className={cn(
+        "group relative h-10 w-full items-center rounded-none px-2 text-white/70",
+        expanded ? "justify-start gap-3" : "justify-center gap-0",
+        active ? "bg-white text-black hover:bg-white" : "hover:bg-white/10 hover:text-white"
       )}
-    </button>
+    >
+      <span className="flex h-5 w-5 items-center justify-center">{icon}</span>
+
+      <div
+        className={cn(
+          "overflow-hidden transition-all duration-300 ease-in-out flex items-center whitespace-nowrap",
+          expanded ? "max-w-[200px] opacity-100 translate-x-1" : "max-w-0 opacity-0 -translate-x-3"
+        )}
+      >
+        <span className={cn(
+          "text-xs font-semibold tracking-[0.22em] uppercase",
+          active ? "text-black" : "text-white/60"
+        )}>
+          {label}
+        </span>
+      </div>
+    </Button>
   );
 }
