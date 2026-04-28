@@ -1,0 +1,81 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --background: #f8fafc;
+  --foreground: #0b0f14;
+  --surface: #ffffff;
+  --surface-elevated: #f1f5f9;
+  --primary: #4f46e5;
+  --accent: #22d3ee;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --border: #e2e8f0;
+  --muted: #64748b;
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+.dark {
+  color-scheme: dark;
+  --background: #0b0f14;
+  --foreground: #e5e7eb;
+  --surface: #111827;
+  --surface-elevated: #161f2b;
+  --primary: #4f46e5;
+  --accent: #22d3ee;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --border: #1f2937;
+  --muted: #9ca3af;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+    margin: 0;
+    min-height: 100%;
+  }
+
+  a {
+    @apply text-inherit no-underline;
+  }
+}
+
+@layer utilities {
+  .map-surface {
+    background-image: radial-gradient(
+        circle at top,
+        rgba(34, 211, 238, 0.18),
+        transparent 55%
+      ),
+      linear-gradient(120deg, rgba(79, 70, 229, 0.18), transparent 60%),
+      linear-gradient(to bottom, rgba(15, 23, 42, 0.35), rgba(15, 23, 42, 0.05));
+  }
+
+  .map-grid {
+    background-image: linear-gradient(
+        to right,
+        rgba(148, 163, 184, 0.2) 1px,
+        transparent 1px
+      ),
+      linear-gradient(
+        to bottom,
+        rgba(148, 163, 184, 0.2) 1px,
+        transparent 1px
+      );
+    background-size: 32px 32px;
+  }
+}
+
+::selection {
+  background: color-mix(in srgb, var(--primary) 35%, transparent);
+}
