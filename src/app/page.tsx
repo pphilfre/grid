@@ -2,10 +2,9 @@
 
 import "mapbox-gl/dist/mapbox-gl.css";
 import mapboxgl from "mapbox-gl";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Activity,
-  AlertCircle,
   ChevronLeft,
   ChevronRight,
   Compass,
@@ -97,26 +96,31 @@ export default function NeumorphicMapDashboard() {
   const styleIdRef = useRef(styleId);
   const is3dRef = useRef(is3d);
 
-  const getStyleConfig = () =>
-    MAP_STYLES.find(style => style.id === styleIdRef.current) ?? MAP_STYLES[0];
+  const getStyleConfig = useCallback(
+    () => MAP_STYLES.find(style => style.id === styleIdRef.current) ?? MAP_STYLES[0],
+    []
+  );
 
-  const apply3dStyle = (map: mapboxgl.Map) => {
-    const { buildingColor, buildingOpacity } = getStyleConfig();
-    if (!map.getLayer("3d-buildings")) {
-      return;
-    }
+  const apply3dStyle = useCallback(
+    (map: mapboxgl.Map) => {
+      const { buildingColor, buildingOpacity } = getStyleConfig();
+      if (!map.getLayer("3d-buildings")) {
+        return;
+      }
 
-    map.setPaintProperty("3d-buildings", "fill-extrusion-color", buildingColor);
-    map.setPaintProperty("3d-buildings", "fill-extrusion-opacity", buildingOpacity);
-    map.setPaintProperty("3d-buildings", "fill-extrusion-color-transition", {
-      duration: 700,
-      delay: 0,
-    });
-    map.setPaintProperty("3d-buildings", "fill-extrusion-opacity-transition", {
-      duration: 700,
-      delay: 0,
-    });
-  };
+      map.setPaintProperty("3d-buildings", "fill-extrusion-color", buildingColor);
+      map.setPaintProperty("3d-buildings", "fill-extrusion-opacity", buildingOpacity);
+      map.setPaintProperty("3d-buildings", "fill-extrusion-color-transition", {
+        duration: 700,
+        delay: 0,
+      });
+      map.setPaintProperty("3d-buildings", "fill-extrusion-opacity-transition", {
+        duration: 700,
+        delay: 0,
+      });
+    },
+    [getStyleConfig]
+  );
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -261,7 +265,7 @@ export default function NeumorphicMapDashboard() {
       mapRef.current = null;
       setMapReady(false);
     };
-  }, []);
+  }, [apply3dStyle, getStyleConfig]);
 
   useEffect(() => {
     if (!mapRef.current || !mapReady) {
@@ -288,7 +292,7 @@ export default function NeumorphicMapDashboard() {
 
       return marker;
     });
-  }, [pulses]);
+  }, [mapReady, pulses]);
 
   useEffect(() => {
     if (!mapRef.current || !mapReady) {
@@ -300,7 +304,7 @@ export default function NeumorphicMapDashboard() {
       mapRef.current.setStyle(style, { diff: false });
     }
     apply3dStyle(mapRef.current);
-  }, [mapReady, styleId]);
+  }, [apply3dStyle, mapReady, styleId]);
 
   useEffect(() => {
     if (!mapRef.current || !mapReady) {
@@ -483,7 +487,7 @@ function NavItem({ icon, label, active, expanded, onClick }: { icon: React.React
 
         <div
           className={cn(
-            "overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] flex items-center whitespace-nowrap",
+            "overflow-hidden transition-all duration-300 ease-in-out flex items-center whitespace-nowrap",
             expanded ? "max-w-[200px] opacity-100 translate-x-3" : "max-w-0 opacity-0 -translate-x-4"
           )}
         >
