@@ -174,9 +174,6 @@ export default function NeumorphicMapDashboard() {
     }
 
     mapboxgl.accessToken = token;
-    if (typeof mapboxgl.setTelemetryEnabled === "function") {
-      mapboxgl.setTelemetryEnabled(false);
-    }
 
     const map = new mapboxgl.Map({
       container: mapContainerRef.current,
