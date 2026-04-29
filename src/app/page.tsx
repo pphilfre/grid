@@ -313,7 +313,6 @@ export default function NeumorphicMapDashboard() {
       const labelLayerId = mapStyle.layers?.find(
         layer => layer.type === "symbol" && "text-field" in (layer.layout ?? {})
       )?.id;
-      const beforeId = labelLayerId;
       const layerDefinition = {
         id: "3d-buildings",
         source: "composite",
@@ -338,10 +337,10 @@ export default function NeumorphicMapDashboard() {
         layout: {
           visibility: is3dRef.current ? "visible" : "none",
         },
-      } as const;
+      };
 
-      if (beforeId) {
-        map.addLayer(layerDefinition, beforeId);
+      if (labelLayerId) {
+        map.addLayer(layerDefinition, labelLayerId);
         return;
       }
 
