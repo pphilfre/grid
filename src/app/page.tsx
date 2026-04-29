@@ -297,6 +297,7 @@ export default function NeumorphicMapDashboard() {
       const labelLayerId = mapStyle.layers?.find(
         layer => layer.type === "symbol" && "text-field" in (layer.layout ?? {})
       )?.id;
+      const beforeId = labelLayerId ?? mapStyle.layers?.find(layer => layer.id === "waterway-label")?.id;
 
       map.addLayer(
         {
@@ -324,7 +325,7 @@ export default function NeumorphicMapDashboard() {
             visibility: is3dRef.current ? "visible" : "none",
           },
         },
-        labelLayerId
+        beforeId
       );
     };
 

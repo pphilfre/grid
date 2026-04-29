@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -22,7 +23,7 @@ export default function RootLayout({
           href="https://api.mapbox.com/mapbox-gl-js/v3.6.0/mapbox-gl.css"
           rel="stylesheet"
         />
-        <script src="https://api.mapbox.com/mapbox-gl-js/v3.6.0/mapbox-gl.js" defer />
+        <Script src="https://api.mapbox.com/mapbox-gl-js/v3.6.0/mapbox-gl.js" strategy="beforeInteractive" />
       </head>
       <body className={`${geist.variable} ${geistMono.variable}`}>{children}</body>
     </html>
