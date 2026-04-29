@@ -1,6 +1,6 @@
 "use client";
 
-import mapboxgl from "mapbox-gl";
+import type { Map as MapboxMap, Marker as MapboxMarker } from "mapbox-gl";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Activity,
@@ -66,6 +66,10 @@ const MAP_STYLES = [
     logoClass: "from-slate-900 via-slate-700 to-slate-500",
     buildingColor: "#111827",
     buildingOpacity: 0.78,
+    config: {
+      lightPreset: "dusk",
+      showPointOfInterestLabels: false,
+    },
   },
   {
     id: "dark",
@@ -96,6 +100,8 @@ const MAP_STYLES = [
   },
 ];
 
+type MapboxGLInstance = typeof import("mapbox-gl")["default"];
+
 export default function NeumorphicMapDashboard() {
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState("map");
@@ -109,8 +115,9 @@ export default function NeumorphicMapDashboard() {
   const [mapReady, setMapReady] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<mapboxgl.Map | null>(null);
-  const markersRef = useRef<Map<number, mapboxgl.Marker>>(new Map());
+  const mapRef = useRef<MapboxMap | null>(null);
+  const markersRef = useRef<Map<number, MapboxMarker>>(new Map());
+  const mapboxglRef = useRef<MapboxGLInstance | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const uploadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const styleIdRef = useRef(styleId);
@@ -122,7 +129,7 @@ export default function NeumorphicMapDashboard() {
   );
 
   const apply3dStyle = useCallback(
-    (map: mapboxgl.Map) => {
+    (map: MapboxMap) => {
       const { buildingColor, buildingOpacity } = getStyleConfig();
       if (!map.getLayer("3d-buildings")) {
         return;
@@ -258,6 +265,13 @@ export default function NeumorphicMapDashboard() {
       return;
     }
 
+    const mapboxgl = (window as typeof window & { mapboxgl?: MapboxGLInstance }).mapboxgl;
+    if (!mapboxgl) {
+      setMapError("Mapbox GL JS failed to load.");
+      return;
+    }
+    mapboxglRef.current = mapboxgl;
+
     const token =
       process.env.NEXT_PUBLIC_MAPBOX_TOKEN ??
       "pk.eyJ1IjoiZnJlZGRpZXBoaWxwb3QiLCJhIjoiY21vaXlydm9sMDdkdTJyczZ0dzM2bTVwdSJ9.kcsSQHik1Bxcy0bvZhWqKQ";
@@ -345,9 +359,12 @@ export default function NeumorphicMapDashboard() {
     map.on("style.load", () => {
       add3dBuildings();
       apply3dStyle(map);
-      if (styleIdRef.current === "standard") {
-        map.setConfigProperty("basemap", "lightPreset", "dusk");
-        map.setConfigProperty("basemap", "showPointOfInterestLabels", false);
+      const styleConfig = getStyleConfig().config;
+      if (styleConfig?.lightPreset) {
+        map.setConfigProperty("basemap", "lightPreset", styleConfig.lightPreset);
+      }
+      if (typeof styleConfig?.showPointOfInterestLabels === "boolean") {
+        map.setConfigProperty("basemap", "showPointOfInterestLabels", styleConfig.showPointOfInterestLabels);
       }
     });
 
@@ -366,12 +383,18 @@ export default function NeumorphicMapDashboard() {
       markersRef.current.clear();
       map.remove();
       mapRef.current = null;
+      mapboxglRef.current = null;
       setMapReady(false);
     };
   }, [apply3dStyle, getStyleConfig]);
 
   useEffect(() => {
     if (!mapRef.current || !mapReady) {
+      return;
+    }
+
+    const mapboxgl = mapboxglRef.current;
+    if (!mapboxgl) {
       return;
     }
 
