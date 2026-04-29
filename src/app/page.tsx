@@ -1,6 +1,5 @@
 "use client";
 
-import "mapbox-gl/dist/mapbox-gl.css";
 import mapboxgl from "mapbox-gl";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -60,6 +59,15 @@ const LIVE_FEED_DATA = [
 
 const MAP_STYLES = [
   {
+    id: "standard",
+    label: "Dusk",
+    logo: "DK",
+    uri: "mapbox://styles/mapbox/standard",
+    logoClass: "from-slate-900 via-slate-700 to-slate-500",
+    buildingColor: "#111827",
+    buildingOpacity: 0.78,
+  },
+  {
     id: "dark",
     label: "Noir",
     logo: "NX",
@@ -92,7 +100,7 @@ export default function NeumorphicMapDashboard() {
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState("map");
   const [pulses, setPulses] = useState(LIVE_FEED_DATA);
-  const [styleId, setStyleId] = useState("dark");
+  const [styleId, setStyleId] = useState("standard");
   const [is3d, setIs3d] = useState(true);
   const [viewMode, setViewMode] = useState<"2d" | "3d" | "blue">("3d");
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -180,7 +188,7 @@ export default function NeumorphicMapDashboard() {
 
     if (viewMode === "3d") {
       setIs3d(true);
-      setStyleId("dark");
+      setStyleId("standard");
       return;
     }
 
@@ -286,6 +294,10 @@ export default function NeumorphicMapDashboard() {
         return;
       }
 
+      const labelLayerId = mapStyle.layers?.find(
+        layer => layer.type === "symbol" && "text-field" in (layer.layout ?? {})
+      )?.id;
+
       map.addLayer(
         {
           id: "3d-buildings",
@@ -312,7 +324,7 @@ export default function NeumorphicMapDashboard() {
             visibility: is3dRef.current ? "visible" : "none",
           },
         },
-        "waterway-label"
+        labelLayerId
       );
     };
 
@@ -332,6 +344,10 @@ export default function NeumorphicMapDashboard() {
     map.on("style.load", () => {
       add3dBuildings();
       apply3dStyle(map);
+      if (styleIdRef.current === "standard") {
+        map.setConfigProperty("basemap", "lightPreset", "dusk");
+        map.setConfigProperty("basemap", "showPointOfInterestLabels", false);
+      }
     });
 
     map.on("error", event => {

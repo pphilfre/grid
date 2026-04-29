@@ -17,6 +17,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <link
+          href="https://api.mapbox.com/mapbox-gl-js/v3.6.0/mapbox-gl.css"
+          rel="stylesheet"
+        />
+        <script src="https://api.mapbox.com/mapbox-gl-js/v3.6.0/mapbox-gl.js" defer />
+      </head>
       <body className={`${geist.variable} ${geistMono.variable}`}>{children}</body>
     </html>
   );
