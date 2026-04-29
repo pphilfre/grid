@@ -9,7 +9,7 @@ const MAPBOX_GL_VERSION = "v3.6.0";
 const MAPBOX_GL_BASE_URL = `https://api.mapbox.com/mapbox-gl-js/${MAPBOX_GL_VERSION}`;
 
 export const metadata: Metadata = {
-  title: 'Nexus Data Grid',
+  title: 'Grid',
   description: 'A tactical data grid interface',
 };
 
