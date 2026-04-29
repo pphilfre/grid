@@ -1,6 +1,6 @@
 "use client";
 
-import type { Map as MapboxMap, Marker as MapboxMarker } from "mapbox-gl";
+import type { FillExtrusionLayerSpecification, Map as MapboxMap, Marker as MapboxMarker } from "mapbox-gl";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Activity,
@@ -17,7 +17,6 @@ import {
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -267,6 +266,7 @@ export default function NeumorphicMapDashboard() {
       return;
     }
 
+    const markers = markersRef.current;
     const mapboxgl = getMapboxGL();
     if (!mapboxgl) {
       setMapError("Mapbox GL JS failed to load.");
@@ -313,11 +313,11 @@ export default function NeumorphicMapDashboard() {
       const labelLayerId = mapStyle.layers?.find(
         layer => layer.type === "symbol" && "text-field" in (layer.layout ?? {})
       )?.id;
-      const layerDefinition = {
+      const layerDefinition: FillExtrusionLayerSpecification = {
         id: "3d-buildings",
         source: "composite",
         "source-layer": "building",
-        filter: ["==", "extrude", "true"],
+        filter: ["==", "extrude", "true"] as const,
         type: "fill-extrusion",
         minzoom: 15,
         paint: {
@@ -383,8 +383,8 @@ export default function NeumorphicMapDashboard() {
     mapRef.current = map;
 
     return () => {
-      markersRef.current.forEach(marker => marker.remove());
-      markersRef.current.clear();
+      markers.forEach(marker => marker.remove());
+      markers.clear();
       map.remove();
       mapRef.current = null;
       mapboxglRef.current = null;
