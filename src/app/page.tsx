@@ -102,6 +102,8 @@ const MAP_STYLES = [
 
 type MapboxGLInstance = typeof import("mapbox-gl")["default"];
 
+const getMapboxGl = () => (window as typeof window & { mapboxgl?: MapboxGLInstance }).mapboxgl;
+
 export default function NeumorphicMapDashboard() {
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState("map");
@@ -265,7 +267,7 @@ export default function NeumorphicMapDashboard() {
       return;
     }
 
-    const mapboxgl = (window as typeof window & { mapboxgl?: MapboxGLInstance }).mapboxgl;
+    const mapboxgl = getMapboxGl();
     if (!mapboxgl) {
       setMapError("Mapbox GL JS failed to load.");
       return;
@@ -312,35 +314,38 @@ export default function NeumorphicMapDashboard() {
         layer => layer.type === "symbol" && "text-field" in (layer.layout ?? {})
       )?.id;
       const beforeId = labelLayerId ?? mapStyle.layers?.find(layer => layer.id === "waterway-label")?.id;
-
-      map.addLayer(
-        {
-          id: "3d-buildings",
-          source: "composite",
-          "source-layer": "building",
-          filter: ["==", "extrude", "true"],
-          type: "fill-extrusion",
-          minzoom: 15,
-          paint: {
-            "fill-extrusion-color": getStyleConfig().buildingColor,
-            "fill-extrusion-height": ["get", "height"],
-            "fill-extrusion-base": ["get", "min_height"],
-            "fill-extrusion-opacity": getStyleConfig().buildingOpacity,
-            "fill-extrusion-color-transition": {
-              duration: 700,
-              delay: 0,
-            },
-            "fill-extrusion-opacity-transition": {
-              duration: 700,
-              delay: 0,
-            },
+      const layerDefinition = {
+        id: "3d-buildings",
+        source: "composite",
+        "source-layer": "building",
+        filter: ["==", "extrude", "true"],
+        type: "fill-extrusion",
+        minzoom: 15,
+        paint: {
+          "fill-extrusion-color": getStyleConfig().buildingColor,
+          "fill-extrusion-height": ["get", "height"],
+          "fill-extrusion-base": ["get", "min_height"],
+          "fill-extrusion-opacity": getStyleConfig().buildingOpacity,
+          "fill-extrusion-color-transition": {
+            duration: 700,
+            delay: 0,
           },
-          layout: {
-            visibility: is3dRef.current ? "visible" : "none",
+          "fill-extrusion-opacity-transition": {
+            duration: 700,
+            delay: 0,
           },
         },
-        beforeId
-      );
+        layout: {
+          visibility: is3dRef.current ? "visible" : "none",
+        },
+      } as const;
+
+      if (beforeId) {
+        map.addLayer(layerDefinition, beforeId);
+        return;
+      }
+
+      map.addLayer(layerDefinition);
     };
 
     map.once("load", () => {
