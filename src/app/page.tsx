@@ -1,7 +1,6 @@
 "use client";
 
-import "mapbox-gl/dist/mapbox-gl.css";
-import mapboxgl from "mapbox-gl";
+import type { Map as MapboxMap, Marker as MapboxMarker } from "mapbox-gl";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Activity,
@@ -60,6 +59,19 @@ const LIVE_FEED_DATA = [
 
 const MAP_STYLES = [
   {
+    id: "standard",
+    label: "Dusk",
+    logo: "DK",
+    uri: "mapbox://styles/mapbox/standard",
+    logoClass: "from-slate-900 via-slate-700 to-slate-500",
+    buildingColor: "#111827",
+    buildingOpacity: 0.78,
+    config: {
+      lightPreset: "dusk",
+      showPointOfInterestLabels: false,
+    },
+  },
+  {
     id: "dark",
     label: "Noir",
     logo: "NX",
@@ -88,11 +100,15 @@ const MAP_STYLES = [
   },
 ];
 
+type MapboxGLInstance = typeof import("mapbox-gl")["default"];
+
+const getMapboxGL = () => (window as typeof window & { mapboxgl?: MapboxGLInstance }).mapboxgl;
+
 export default function NeumorphicMapDashboard() {
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState("map");
   const [pulses, setPulses] = useState(LIVE_FEED_DATA);
-  const [styleId, setStyleId] = useState("dark");
+  const [styleId, setStyleId] = useState("standard");
   const [is3d, setIs3d] = useState(true);
   const [viewMode, setViewMode] = useState<"2d" | "3d" | "blue">("3d");
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -101,8 +117,9 @@ export default function NeumorphicMapDashboard() {
   const [mapReady, setMapReady] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<mapboxgl.Map | null>(null);
-  const markersRef = useRef<Map<number, mapboxgl.Marker>>(new Map());
+  const mapRef = useRef<MapboxMap | null>(null);
+  const markersRef = useRef<Map<number, MapboxMarker>>(new Map());
+  const mapboxglRef = useRef<MapboxGLInstance | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const uploadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const styleIdRef = useRef(styleId);
@@ -114,7 +131,7 @@ export default function NeumorphicMapDashboard() {
   );
 
   const apply3dStyle = useCallback(
-    (map: mapboxgl.Map) => {
+    (map: MapboxMap) => {
       const { buildingColor, buildingOpacity } = getStyleConfig();
       if (!map.getLayer("3d-buildings")) {
         return;
@@ -180,7 +197,7 @@ export default function NeumorphicMapDashboard() {
 
     if (viewMode === "3d") {
       setIs3d(true);
-      setStyleId("dark");
+      setStyleId("standard");
       return;
     }
 
@@ -250,6 +267,13 @@ export default function NeumorphicMapDashboard() {
       return;
     }
 
+    const mapboxgl = getMapboxGL();
+    if (!mapboxgl) {
+      setMapError("Mapbox GL JS failed to load.");
+      return;
+    }
+    mapboxglRef.current = mapboxgl;
+
     const token =
       process.env.NEXT_PUBLIC_MAPBOX_TOKEN ??
       "pk.eyJ1IjoiZnJlZGRpZXBoaWxwb3QiLCJhIjoiY21vaXlydm9sMDdkdTJyczZ0dzM2bTVwdSJ9.kcsSQHik1Bxcy0bvZhWqKQ";
@@ -286,34 +310,41 @@ export default function NeumorphicMapDashboard() {
         return;
       }
 
-      map.addLayer(
-        {
-          id: "3d-buildings",
-          source: "composite",
-          "source-layer": "building",
-          filter: ["==", "extrude", "true"],
-          type: "fill-extrusion",
-          minzoom: 15,
-          paint: {
-            "fill-extrusion-color": getStyleConfig().buildingColor,
-            "fill-extrusion-height": ["get", "height"],
-            "fill-extrusion-base": ["get", "min_height"],
-            "fill-extrusion-opacity": getStyleConfig().buildingOpacity,
-            "fill-extrusion-color-transition": {
-              duration: 700,
-              delay: 0,
-            },
-            "fill-extrusion-opacity-transition": {
-              duration: 700,
-              delay: 0,
-            },
+      const labelLayerId = mapStyle.layers?.find(
+        layer => layer.type === "symbol" && "text-field" in (layer.layout ?? {})
+      )?.id;
+      const layerDefinition = {
+        id: "3d-buildings",
+        source: "composite",
+        "source-layer": "building",
+        filter: ["==", "extrude", "true"],
+        type: "fill-extrusion",
+        minzoom: 15,
+        paint: {
+          "fill-extrusion-color": getStyleConfig().buildingColor,
+          "fill-extrusion-height": ["get", "height"],
+          "fill-extrusion-base": ["get", "min_height"],
+          "fill-extrusion-opacity": getStyleConfig().buildingOpacity,
+          "fill-extrusion-color-transition": {
+            duration: 700,
+            delay: 0,
           },
-          layout: {
-            visibility: is3dRef.current ? "visible" : "none",
+          "fill-extrusion-opacity-transition": {
+            duration: 700,
+            delay: 0,
           },
         },
-        "waterway-label"
-      );
+        layout: {
+          visibility: is3dRef.current ? "visible" : "none",
+        },
+      };
+
+      if (labelLayerId) {
+        map.addLayer(layerDefinition, labelLayerId);
+        return;
+      }
+
+      map.addLayer(layerDefinition);
     };
 
     map.once("load", () => {
@@ -332,6 +363,13 @@ export default function NeumorphicMapDashboard() {
     map.on("style.load", () => {
       add3dBuildings();
       apply3dStyle(map);
+      const styleConfig = getStyleConfig().config;
+      if (styleConfig?.lightPreset) {
+        map.setConfigProperty("basemap", "lightPreset", styleConfig.lightPreset);
+      }
+      if (typeof styleConfig?.showPointOfInterestLabels === "boolean") {
+        map.setConfigProperty("basemap", "showPointOfInterestLabels", styleConfig.showPointOfInterestLabels);
+      }
     });
 
     map.on("error", event => {
@@ -349,12 +387,18 @@ export default function NeumorphicMapDashboard() {
       markersRef.current.clear();
       map.remove();
       mapRef.current = null;
+      mapboxglRef.current = null;
       setMapReady(false);
     };
   }, [apply3dStyle, getStyleConfig]);
 
   useEffect(() => {
     if (!mapRef.current || !mapReady) {
+      return;
+    }
+
+    const mapboxgl = mapboxglRef.current;
+    if (!mapboxgl) {
       return;
     }
 
