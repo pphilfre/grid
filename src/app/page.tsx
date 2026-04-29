@@ -102,7 +102,7 @@ const MAP_STYLES = [
 
 type MapboxGLInstance = typeof import("mapbox-gl")["default"];
 
-const getMapboxGl = () => (window as typeof window & { mapboxgl?: MapboxGLInstance }).mapboxgl;
+const getMapboxGL = () => (window as typeof window & { mapboxgl?: MapboxGLInstance }).mapboxgl;
 
 export default function NeumorphicMapDashboard() {
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
@@ -267,7 +267,7 @@ export default function NeumorphicMapDashboard() {
       return;
     }
 
-    const mapboxgl = getMapboxGl();
+    const mapboxgl = getMapboxGL();
     if (!mapboxgl) {
       setMapError("Mapbox GL JS failed to load.");
       return;
@@ -313,7 +313,7 @@ export default function NeumorphicMapDashboard() {
       const labelLayerId = mapStyle.layers?.find(
         layer => layer.type === "symbol" && "text-field" in (layer.layout ?? {})
       )?.id;
-      const beforeId = labelLayerId ?? mapStyle.layers?.find(layer => layer.id === "waterway-label")?.id;
+      const beforeId = labelLayerId;
       const layerDefinition = {
         id: "3d-buildings",
         source: "composite",
